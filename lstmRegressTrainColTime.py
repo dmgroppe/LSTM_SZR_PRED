@@ -39,7 +39,7 @@ from datetime import datetime
 import argparse
 
 import sys
-sys.path.append('/Users/davidgroppe/PycharmProjects/DG_LIBRARY')
+#sys.path.append('/Users/davidgroppe/PycharmProjects/DG_LIBRARY')
 #sys.path.append('/home/h/honey/dgroppe/DG_LIBRARY')
 import dgFuncs as dg
 
