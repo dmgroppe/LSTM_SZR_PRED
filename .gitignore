@@ -1,3 +1,9 @@
+*.pdf
+*.pkl
+*.npz
+*.jpg
+*.mat
+*.h5
 PAPERS
 SAMPLE_DATA
 .DS_Store
