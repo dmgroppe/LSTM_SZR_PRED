@@ -231,7 +231,7 @@ print('Creating Stateful Model...')
 batch_size = 1
 n_wind=31
 mid_wind=int(np.ceil(n_wind/2))
-n_train_iter = 100 # max # of training iterations
+n_train_iter = 200 # max # of training iterations
 n_train_batch=100 # # of epochs to train in each iteration on before computing validation error
 n_valid_batch=500 # # of epochs to use for estimating validation error
 n_test_batch=100 # # of test epochs to plot and estimate testing error on
