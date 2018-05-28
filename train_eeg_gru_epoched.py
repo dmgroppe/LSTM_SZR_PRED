@@ -8,7 +8,7 @@ import pandas as pd
 from keras.models import Sequential, load_model
 from keras.layers import Dense, GRU, CuDNNGRU, Activation, Dropout
 #from keras.layers import Dense, LSTM, GRU
-from keras.optimizers import RMSprop
+from keras.optimizers import RMSprop, SGD
 import scipy.io as sio
 import scipy.stats as stats
 import os
@@ -148,7 +148,8 @@ def create_model(stateful,n_wind,batch_size,n_hidden,n_layers,lrate):
     model.add(Dense(2))
     rmsp = RMSprop(lr=lrate)
     #rmsp = RMSprop(lr=0.0001)
-    model.compile(loss='mse', optimizer=rmsp)
+    #model.compile(loss='mse', optimizer=rmsp)
+    model.compile(loss='mse', optimizer='sgd')
     model.summary()
     return model
 
@@ -231,10 +232,10 @@ print('Creating Stateful Model...')
 batch_size = 1
 n_wind=31
 mid_wind=int(np.ceil(n_wind/2))
-n_train_iter = 2 # max # of training iterations
-n_train_batch=10 # # of epochs to train in each iteration on before computing validation error
-n_valid_batch=50 # # of epochs to use for estimating validation error
-n_test_batch=10 # # of test epochs to plot and estimate testing error on
+n_train_iter = 200 # max # of training iterations
+n_train_batch=100 # # of epochs to train in each iteration on before computing validation error
+n_valid_batch=500 # # of epochs to use for estimating validation error
+n_test_batch=100 # # of test epochs to plot and estimate testing error on
 stateful=True
 model_stateful = create_model(stateful,n_wind,batch_size,n_hidden,n_layers,lr)
 model_fname='cuda_gru_epoched.h5'
