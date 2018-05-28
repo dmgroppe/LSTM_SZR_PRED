@@ -1,30 +1,25 @@
 """ Word up. """
+
 from __future__ import print_function
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import pandas as pd
-import sys
 from keras.models import Sequential, load_model
-from keras.layers import Dense, SimpleRNN, Activation, Dropout
-if sys.platform=='darwin':
-    from keras.layers import GRU
-else:
-    from keras.layers import CuDNNGRU
+from keras.layers import Dense, GRU, CuDNNGRU, Activation, Dropout
+#from keras.layers import Dense, LSTM, GRU
 from keras.optimizers import RMSprop, SGD
-from keras.constraints import max_norm
 import scipy.io as sio
 import scipy.stats as stats
 import os
-
+import sys
 # import ieeg_funcs as ief
 # import dgFuncs as dg
 #import pickle
 #from sklearn.externals import joblib
 import json
 from shutil import copyfile
-
+matplotlib.use('TkAgg')
 
 # np.random.seed(0)
 # print('Seeding random seed generator!!!')
@@ -134,36 +129,23 @@ def get_all_data(x,y_eeg,y_art,id_range,n_wind):
 # Function for creating model
 def create_model(stateful,n_wind,batch_size,n_hidden,n_layers,lrate,opt):
     model = Sequential()
-    # Add initial RELU layer
-    model.add(SimpleRNN(int(n_hidden[0]),
+    if n_layers==1:
+        model.add(CuDNNGRU(n_hidden,
                   input_shape=(n_wind, 1),
                   batch_size=batch_size,
-                  activation='relu',
-                  recurrent_constraint=max_norm(0.0),
-                  return_sequences=True,
-                  dropout=0.5,
                   stateful=stateful))
-    # Add GRU Layer
-    if n_layers==1:
-        if sys.platform == "darwin":
-            model.add(GRU(int(n_hidden[1]),
-                      # input_shape=(n_wind, 1),
-                      #batch_size=batch_size,
-                      stateful=stateful))
-        else:
-            model.add(CuDNNGRU(int(n_hidden[1]),
-                      #input_shape=(n_wind, 1),
-                      #batch_size=batch_size,
-                      stateful=stateful))
-    # Add RELU layer
-    model.add(Dense(int(n_hidden[1])))
+    else:
+        model.add(CuDNNGRU(n_hidden,
+                  input_shape=(n_wind, 1),
+                  batch_size=batch_size,
+                  return_sequences=True,
+                  stateful=stateful))
+        for a in range(1,n_layers):
+            model.add(CuDNNGRU(n_hidden,stateful=stateful))
+    model.add(Dense(n_hidden))
     model.add(Activation('relu'))
     model.add(Dropout(0.5))
-
-    # Linear Output Layer
     model.add(Dense(2))
-
-    # Optimizer
     if opt=='sgd':
         print('Using SGD...')
         sgd=SGD(lr=lrate, momentum=lrate/10, decay=0., nesterov=True)
@@ -216,10 +198,7 @@ print('learning rate is %s' % opt)
 
 # Find if there are any existing models of this name
 # If so, grab the number of model an increment that number by 1 to get new model name
-if sys.platform=='darwin':
-    model_root = '/Users/davidgroppe/PycharmProjects/LSTM_SZR_PRED/MODELS/'
-else:
-    model_root='/home/dgroppe/GIT/LSTM_SZR_PRED/MODELS/'
+model_root='/home/dgroppe/GIT/LSTM_SZR_PRED/MODELS/'
 model_num=1
 for f in os.listdir(model_root):
     if os.path.isdir(os.path.join(model_root,f)):
@@ -258,22 +237,11 @@ test_ids=np.arange(n_train_ep+n_valid_ep,n_train_ep+n_valid_ep+n_test_ep)
 print('Creating Stateful Model...')
 batch_size = 1
 n_wind=31
-n_hidden=np.zeros(2,dtype=int)
-n_hidden[0]=128
-n_hidden[1]=256
 mid_wind=int(np.ceil(n_wind/2))
-if True:
-    n_train_iter = 200 # max # of training iterations
-    n_train_batch=100 # # of epochs to train in each iteration on before computing validation error
-    n_valid_batch=500 # # of epochs to use for estimating validation error
-    n_test_batch=100 # # of test epochs to plot and estimate testing error on
-else:
-    # For debugging
-    n_train_iter = 2  # max # of training iterations
-    n_train_batch = 1  # # of epochs to train in each iteration on before computing validation error
-    n_valid_batch = 1  # # of epochs to use for estimating validation error
-    n_test_batch = 1  # # of test epochs to plot and estimate testing error on
-
+n_train_iter = 200 # max # of training iterations
+n_train_batch=100 # # of epochs to train in each iteration on before computing validation error
+n_valid_batch=500 # # of epochs to use for estimating validation error
+n_test_batch=100 # # of test epochs to plot and estimate testing error on
 stateful=True
 model_stateful = create_model(stateful,n_wind,batch_size,n_hidden,n_layers,lr,opt)
 model_fname='cuda_gru_epoched.h5'
@@ -283,7 +251,6 @@ val_loss=list()
 val_art_loss=list()
 val_eeg_loss=list()
 train_loss=list()
-train_loss_se=list()
 val_loss_se = list()
 val_art_loss_se = list()
 val_eeg_loss_se = list()
@@ -340,12 +307,11 @@ for i in range(n_train_iter):
     val_loss.append(np.mean(temp_grand_loss))
     val_loss_se.append(stats.sem(temp_grand_loss))
     plt.figure(1)
-    train_iter = np.arange(1, len(val_loss) + 1)
     plt.clf()
-    plt.errorbar(train_iter, np.asarray(val_loss), yerr=np.asarray(val_loss_se)*1.96, fmt='-', label='val')
-    plt.errorbar(train_iter, np.asarray(val_art_loss), yerr=np.asarray(val_art_loss_se)*1.96, fmt='-', label='val_art')
-    plt.errorbar(train_iter, np.asarray(val_eeg_loss), yerr=np.asarray(val_eeg_loss_se)*1.96, fmt='-', label='val_eeg')
-    plt.errorbar(train_iter, np.asarray(train_loss), yerr=np.asarray(train_loss_se) * 1.96, fmt='-', label='train')
+    plt.errorbar(train_iter, np.asarray(val_loss), yerr=np.asarray(val_loss_se*1.96), fmt='-', label='val')
+    plt.errorbar(train_iter, np.asarray(val_art_loss), yerr=np.asarray(val_art_loss_se*1.96), fmt='-', label='val_art')
+    plt.errorbar(train_iter, np.asarray(val_eeg_loss), yerr=np.asarray(val_eeg_loss_se*1.96), fmt='-', label='val_eeg')
+    plt.errorbar(train_iter, np.asarray(train_loss), yerr=np.asarray(train_loss_se * 1.96), fmt='-', label='train')
     plt.legend()
     # plt.show()
     plt.savefig(os.path.join(fig_path, 'epoched_eeg_loss.pdf'))
@@ -370,12 +336,11 @@ for i in range(n_train_iter):
 
 # Plot Training & Validation Error
 plt.figure(1)
-train_iter=np.arange(1,len(val_loss)+1)
 plt.clf()
-plt.errorbar(train_iter, np.asarray(val_loss), yerr=np.asarray(val_loss_se) * 1.96, fmt='-', label='val')
-plt.errorbar(train_iter, np.asarray(val_art_loss), yerr=np.asarray(val_art_loss_se) * 1.96, fmt='-', label='val_art')
-plt.errorbar(train_iter, np.asarray(val_eeg_loss), yerr=np.asarray(val_eeg_loss_se) * 1.96, fmt='-', label='val_eeg')
-plt.errorbar(train_iter, np.asarray(train_loss), yerr=np.asarray(train_loss_se) * 1.96, fmt='-', label='train')
+plt.errorbar(train_iter, np.asarray(val_loss), yerr=np.asarray(val_loss_se * 1.96), fmt='-', label='val')
+plt.errorbar(train_iter, np.asarray(val_art_loss), yerr=np.asarray(val_art_loss_se * 1.96), fmt='-', label='val_art')
+plt.errorbar(train_iter, np.asarray(val_eeg_loss), yerr=np.asarray(val_eeg_loss_se * 1.96), fmt='-', label='val_eeg')
+plt.errorbar(train_iter, np.asarray(train_loss), yerr=np.asarray(train_loss_se * 1.96), fmt='-', label='train')
 plt.legend()
 # plt.show()
 plt.savefig(os.path.join(fig_path, 'epoched_eeg_loss.pdf'))
