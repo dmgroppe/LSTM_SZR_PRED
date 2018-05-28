@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import sys
 from keras.models import Sequential, load_model
-from keras.layers import Dense, SimpleRNN, Activation, Dropout
+from keras.layers import Dense, SimpleRNN, Activation, Dropout, Merge
 if sys.platform=='darwin':
     from keras.layers import GRU
 else:
@@ -36,48 +36,6 @@ def norm_eeg(eeg):
     shrinkage=3*iqr
     eeg=(eeg-md)/(shrinkage)
     return eeg, (md, shrinkage)
-
-
-def gen_sim_art_eeg_data(art_type):
-    # Load data and split it into train, valid, & test
-    in_fname='SAMPLE_DATA/clean_data_py_format.mat'
-    mat=sio.loadmat(in_fname)
-    eeg=mat['data'][4,:] # Channel Fz
-    n_tpt=len(eeg)
-    eeg=(eeg-np.mean(eeg))/(2*np.std(eeg))
-
-    art = np.zeros(eeg.shape)
-    # Create triangle waves at random intervals
-    # blinks last about 60 samples (~0.5 seconds)
-    in_art=False
-    delt=.05
-    for t in range(1,n_tpt):
-        if in_art==False:
-            if np.random.rand(1)[0]>=0.999:
-                in_art=True
-                art_val = 0
-                ct = 0
-        elif ct<=60:
-            art_val=art_val+delt
-            art[t]=np.sin(art_val)
-            ct=ct+1
-        else:
-            in_art=False
-    # scale some more TODO edit later
-    eeg = eeg * .1
-    art = art * .7
-    raw = eeg + art
-    # plt.figure(1)
-    # plt.plot(art)
-    # plt.show()
-    #
-    # plt.figure(2)
-    # plt.plot(art,label='art')
-    # plt.plot(eeg,label='eeg')
-    # plt.plot(raw,label='raw')
-    # plt.legend()
-    # plt.show()
-    return raw, eeg, art
 
 
 def load_eeg_data():
@@ -115,22 +73,6 @@ def get_data_clip(x,y_eeg,y_art,id_range,n_clip_tpt,n_wind):
     return x_clip, y_clip
 
 
-def get_all_data(x,y_eeg,y_art,id_range,n_wind):
-    temp_n_tpt=id_range[1]-id_range[0]
-    n_clip_tpt=temp_n_tpt-n_wind-1
-    x_clip=np.zeros((n_clip_tpt,n_wind,1))
-    y_clip=np.zeros((n_clip_tpt,2))
-    for ct in range(0,n_clip_tpt):
-        x_clip[ct,:,0]=x[id_range[0]+ct:id_range[0]+ct+n_wind]
-        y_clip[ct,0]=y_eeg[id_range[0]+ct+int(np.floor(n_wind/2))] # Target output is the value of the clean and artifact data at
-        # the center time point
-        y_clip[ct,1]=y_art[id_range[0]+ct+int(np.floor(n_wind/2))]
-        #x_clip[ct,:,0]=x[0,cursor:cursor+n_wind]
-        #y_clip[ct,0]=y[0,cursor+int(np.floor(n_wind/2))]
-    x_clip=np.flip(x_clip,1) #TODO do this once to the data to speed up clip generation
-    return x_clip, y_clip
-
-
 # Function for creating model
 def create_model(stateful,n_wind,batch_size,n_hidden,n_layers,lrate,opt):
     model = Sequential()
@@ -159,10 +101,63 @@ def create_model(stateful,n_wind,batch_size,n_hidden,n_layers,lrate,opt):
     model.add(Dense(int(n_hidden[1])))
     model.add(Activation('relu'))
     model.add(Dropout(0.5))
-
     # Linear Output Layer
     model.add(Dense(2))
+    # Optimizer
+    if opt=='sgd':
+        print('Using SGD...')
+        sgd=SGD(lr=lrate, momentum=lrate/10, decay=0., nesterov=True)
+        model.compile(loss='mse', optimizer=sgd)
+    else:
+        print('Using RMSprop...')
+        rmsp = RMSprop(lr=lrate)
+        #rmsp = RMSprop(lr=0.0001)
+        model.compile(loss='mse', optimizer=rmsp)
+    model.summary()
+    return model
 
+def create_merge_model(stateful,n_wind,batch_size,n_hidden,n_layers,lrate,opt):
+    n_gru=128
+    # FF Branch
+    ff_model = Sequential()
+    # Add initial RELU layer
+    ff_model.add(SimpleRNN(int(n_gru),
+                  input_shape=(n_wind, 1),
+                  batch_size=batch_size,
+                  activation='relu',
+                  recurrent_constraint=max_norm(0.0),
+                  return_sequences=True,
+                  dropout=0.5,
+                  stateful=stateful))
+    # GRU Branch
+    r_model = Sequential()
+    r_model.add(SimpleRNN(int(n_wind*2),
+                  input_shape=(n_wind, 1),
+                  batch_size=batch_size,
+                  activation='relu',
+                  recurrent_constraint=max_norm(0.0),
+                  return_sequences=True,
+                  dropout=0.5,
+                  stateful=stateful))
+    if sys.platform == "darwin":
+        r_model.add(GRU(n_gru,
+                  # input_shape=(n_wind, 1),
+                  #batch_size=batch_size,
+                  stateful=stateful))
+    else:
+        r_model.add(CuDNNGRU(n_gru,
+                  #input_shape=(n_wind, 1),
+                  #batch_size=batch_size,
+                  stateful=stateful))
+    # Merge branches
+    model = Sequential()
+    model.add(Merge([ff_model, r_model], mode='concat'))
+    # Add RELU layer
+    model.add(Dense(int(n_gru*2)))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+    # Linear Output Layer
+    model.add(Dense(2))
     # Optimizer
     if opt=='sgd':
         print('Using SGD...')

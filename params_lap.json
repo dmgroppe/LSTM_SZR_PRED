@@ -1,4 +1,4 @@
-{"model_name": "layer1",
+{"model_name": "merged",
 "n_layers": 1,
 "n_hidden": 512,
 "learning_rate": 0.000001,
