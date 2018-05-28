@@ -8,7 +8,7 @@ import pandas as pd
 from keras.models import Sequential, load_model
 from keras.layers import Dense, GRU, CuDNNGRU, Activation, Dropout
 #from keras.layers import Dense, LSTM, GRU
-from keras.optimizers import RMSprop, SGD
+from keras.optimizers import RMSprop
 import scipy.io as sio
 import scipy.stats as stats
 import os
@@ -148,8 +148,7 @@ def create_model(stateful,n_wind,batch_size,n_hidden,n_layers,lrate):
     model.add(Dense(2))
     rmsp = RMSprop(lr=lrate)
     #rmsp = RMSprop(lr=0.0001)
-    #model.compile(loss='mse', optimizer=rmsp)
-    model.compile(loss='mse', optimizer='sgd')
+    model.compile(loss='mse', optimizer=rmsp)
     model.summary()
     return model
 
@@ -188,7 +187,8 @@ patience=int(params['patience'])
 print('patience is %d' % patience)
 lr=float(params['learning_rate'])
 print('learning rate is %f' % lr)
-
+opt=params['optimizer']
+print('learning rate is %s' % opt)
 
 # Find if there are any existing models of this name
 # If so, grab the number of model an increment that number by 1 to get new model name
@@ -244,9 +244,6 @@ out_metrics_fname = os.path.join(model_path, 'train_metrics.npz')
 val_loss=list()
 val_art_loss=list()
 val_eeg_loss=list()
-val_loss_se = list()
-val_art_loss_se = list()
-val_eeg_loss_se = list()
 train_loss=list()
 
 # val_loss=np.zeros(epochs) # TODO
@@ -276,8 +273,8 @@ for i in range(n_train_iter):
     train_loss.append(temp_loss/n_train_batch)
 
     #Estimate validation error from a few random epochs
-    temp_art_loss = np.zeros(n_valid_batch)
-    temp_eeg_loss = np.zeros(n_valid_batch)
+    temp_art_loss = 0
+    temp_eeg_loss = 0
     print('Estimating validation error from %d epochs' % n_valid_batch)
     for j in range(n_valid_batch):
         if (j%50)==0:
@@ -286,28 +283,19 @@ for i in range(n_train_iter):
         epoch_id = np.random.randint(n_train_ep, n_train_ep+n_valid_ep)
         x, y = format_ep(raw[:, epoch_id], clean[:, epoch_id], art[:, epoch_id], n_wind, n_tpt, mid_wind)
         y_hat = model_stateful.predict(x,batch_size=batch_size)
-        temp_eeg_loss[j] = np.sqrt(np.mean(np.square(y[:, 0] - y_hat[:, 0])))
-        temp_art_loss[j] = np.sqrt(np.mean(np.square(y[:, 1] - y_hat[:, 1])))
+        temp_eeg_loss += np.sqrt(np.mean(np.square(y[:,0]-y_hat[:,0])))
+        temp_art_loss += np.sqrt(np.mean(np.square(y[:,1]-y_hat[:,1])))
         model_stateful.reset_states()
 
-    val_eeg_loss.append(np.mean(temp_eeg_loss))
-    val_eeg_loss_se.append(stats.sem(temp_eeg_loss))
-    val_art_loss.append(np.mean(temp_art_loss))
-    val_art_loss_se.append(stats.sem(temp_art_loss))
+    val_eeg_loss.append(temp_eeg_loss / n_valid_batch)
+    val_art_loss.append(temp_art_loss / n_valid_batch)
     val_loss.append((val_eeg_loss[-1]+val_art_loss[-1])/2)
-    val_loss_se.append(stats.sem((temp_eeg_loss+temp_art_loss)/2))
-    # val_eeg_loss.append(temp_eeg_loss / n_valid_batch)
-    # val_art_loss.append(temp_art_loss / n_valid_batch)
-    # val_loss.append((val_eeg_loss[-1]+val_art_loss[-1])/2)
-    train_iter = np.arange(1, len(val_loss) + 1)
     plt.figure(1)
     plt.clf()
-    plt.errorbar(train_iter, np.asarray(val_loss), yerr=np.asarray(val_loss_se) * 1.96, fmt='s-', label='val')
-    plt.errorbar(train_iter, np.asarray(val_art_loss), yerr=np.asarray(val_art_loss_se) * 1.96, fmt='x-',
-                 label='val_art')
-    plt.errorbar(train_iter, np.asarray(val_eeg_loss), yerr=np.asarray(val_eeg_loss_se) * 1.96, fmt='d-',
-                 label='val_eeg')
-    plt.plot(train_iter, np.asarray(train_loss), '-o', label='train')
+    plt.plot(np.asarray(val_loss), '-o', label='val')
+    plt.plot(np.asarray(val_art_loss), '-o', label='val_art')
+    plt.plot(np.asarray(val_eeg_loss), '-o', label='val_eeg')
+    plt.plot(np.asarray(train_loss), '-o', label='train')
     plt.legend()
     # plt.show()
     plt.savefig(os.path.join(fig_path, 'epoched_eeg_loss.pdf'))
@@ -331,13 +319,12 @@ for i in range(n_train_iter):
         break
 
 # Plot Training & Validation Error
-train_iter=np.arange(1,len(val_loss)+1)
 plt.figure(1)
 plt.clf()
-plt.errorbar(train_iter, np.asarray(val_loss), yerr=np.asarray(val_loss_se)* 1.96, fmt='s-', label='val')
-plt.errorbar(train_iter, np.asarray(val_art_loss), yerr=np.asarray(val_art_loss_se)* 1.96, fmt='x-', label='val_art')
-plt.errorbar(train_iter, np.asarray(val_eeg_loss), yerr=np.asarray(val_eeg_loss_se)* 1.96, fmt='d-', label='val_eeg')
-plt.plot(train_iter, np.asarray(train_loss), '-o', label='train')
+plt.plot(np.asarray(val_loss),'-o',label='val')
+plt.plot(np.asarray(val_art_loss),'-o',label='val_art')
+plt.plot(np.asarray(val_eeg_loss),'-o',label='val_eeg')
+plt.plot(np.asarray(train_loss),'-o',label='train')
 plt.legend()
 #plt.show()
 plt.savefig(os.path.join(fig_path,'epoched_eeg_loss.pdf'))
