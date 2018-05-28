@@ -7,9 +7,10 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import pandas as pd
 from keras.models import Sequential
-from keras.layers import Dense, GRU, Dropout, Activation
+from keras.layers import Dense, GRU, Dropout, Activation, Reshape, SimpleRNN
 #from keras.layers import Dense, LSTM, GRU
 from keras.models import load_model
+from keras.constraints import max_norm
 from keras.optimizers import RMSprop
 import scipy.io as sio
 import scipy.stats as stats
@@ -133,12 +134,22 @@ def inv_normalize(x,mn,sd):
 # Function for creating model
 def create_model(stateful,n_wind,batch_size):
     model = Sequential()
-    n_hidden=120
-    model.add(GRU(n_hidden,
-              input_shape=(n_wind, 1),
-              batch_size=batch_size,
-              stateful=stateful))
-    model.add(Dropout(0.5))
+    n_hid1=n_wind*2
+    n_hid1=2
+    model.add(SimpleRNN(n_hid1,
+                  input_shape=(n_wind, 1),
+                  batch_size=batch_size,
+                  activation='relu',
+                  recurrent_constraint=max_norm(0.0),
+                  return_sequences=False,
+                  dropout=0.5,
+                  stateful=stateful))
+    # n_hidden=1
+    # model.add(GRU(n_hidden,
+    #           stateful=stateful))
+    # model.add(Dense(60))
+    # model.add(Activation('relu'))
+    # model.add(Dropout(0.5))
     model.add(Dense(2))
     rmsp = RMSprop(lr=0.000001)
     #rmsp = RMSprop(lr=0.0001)
@@ -146,6 +157,23 @@ def create_model(stateful,n_wind,batch_size):
     model.summary()
     return model
 
+# GRU->relu->out
+# def create_model(stateful,n_wind,batch_size):
+#     model = Sequential()
+#     n_hidden=120
+#     model.add(GRU(n_hidden,
+#               input_shape=(n_wind, 1),
+#               batch_size=batch_size,
+#               stateful=stateful))
+#     model.add(Dense(60))
+#     model.add(Activation('relu'))
+#     model.add(Dropout(0.5))
+#     model.add(Dense(2))
+#     rmsp = RMSprop(lr=0.000001)
+#     #rmsp = RMSprop(lr=0.0001)
+#     model.compile(loss='mse', optimizer=rmsp)
+#     model.summary()
+#     return model
 
 def format_ep(raw_ep, clean_ep, art_ep, n_wind, n_tpt, mid_wind):
     # x_train = n_tpt-n_wind x n_wind x 1
@@ -183,13 +211,14 @@ if __name__ == '__main__':
     batch_size = 1
     n_wind=31
     mid_wind=int(np.ceil(n_wind/2))
-    n_train_iter = 3 # max # of training iterations
-    n_train_batch=10 # # of epochs to train in each iteration on before computing validation error
-    n_valid_batch=50 # # of epochs to use for estimating validation error
-    n_test_batch=10 # # of test epochs to plot and estimate testing error on
+    n_train_iter = 1 # max # of training iterations
+    n_train_batch=5 # # of epochs to train in each iteration on before computing validation error
+    n_valid_batch=3 # # of epochs to use for estimating validation error
+    n_test_batch=1 # # of test epochs to plot and estimate testing error on
     stateful=True
     model_stateful = create_model(stateful,n_wind,batch_size)
     model_fname='temp_epoched.h5'
+    print(model_stateful.get_weights())
 
     val_loss=list()
     val_art_loss=list()
@@ -210,19 +239,37 @@ if __name__ == '__main__':
 
         # Train on a few random epochs
         temp_loss=0
+        train_ids=np.zeros(n_train_batch)
+        keras_loss=np.zeros(n_train_batch)
+        man_loss=np.zeros(n_train_batch)
         for j in range(n_train_batch):
             # grab a random training epoch
             epoch_id=np.random.randint(0,n_train_ep)
+            train_ids[j]=epoch_id
             x_train, y_train=format_ep(raw[:,epoch_id], clean[:,epoch_id], art[:,epoch_id], n_wind, n_tpt, mid_wind)
+            print("x-train.shape {}".format(x_train.shape))
             train_hist=model_stateful.fit(x_train,
                                y_train,
                                batch_size=batch_size,
                                epochs=1,
                                verbose=1,
                                shuffle=False)
-            temp_loss+=train_hist.history['loss'][0]
+            temp_loss+=np.sqrt(train_hist.history['loss'][0])
+            keras_loss[j]=np.sqrt(train_hist.history['loss'][0])
+            model_stateful.reset_states()
+
+            # Manually compute errer
+            y_train_hat = model_stateful.predict(x_train,batch_size=batch_size)
+            man_loss[j] = np.sqrt(np.mean(np.square(y_train-y_train_hat)))
+            # temp_eeg_loss[j]= np.sqrt(np.mean(np.square(y_train[:,0]-y_train_hat[:,0])))
+            # temp_art_loss[j]= np.sqrt(np.mean(np.square(y_train[:,1]-y_train_hat[:,1])))
             model_stateful.reset_states()
         train_loss.append(temp_loss/n_train_batch)
+
+        print('saving temp.npz')
+        np.savez('temp.npz',
+                 keras_loss=keras_loss,
+                 man_loss=man_loss)
 
         #Estimate validation error from a few random epochs
         temp_art_loss = np.zeros(n_valid_batch)
@@ -263,11 +310,11 @@ if __name__ == '__main__':
 
     # Plot Training & Validation Error
     train_iter=np.arange(1,len(val_loss)+1)
-    np.savez('temp.npz',
-             train_iter=train_iter,
-             val_loss=val_loss,
-             val_loss_se=val_loss_se,
-             train_loss=train_loss)
+    # np.savez('temp.npz',
+    #          train_iter=train_iter,
+    #          val_loss=val_loss,
+    #          val_loss_se=val_loss_se,
+    #          train_loss=train_loss)
     plt.figure(1)
     plt.clf()
     # plt.plot(np.asarray(val_loss),'-o',label='val')
@@ -323,4 +370,4 @@ if __name__ == '__main__':
     test_loss=(test_eeg_loss+test_art_loss)/2
     print('Both %f' % test_loss)
 
-
+    print(model_stateful.get_weights())

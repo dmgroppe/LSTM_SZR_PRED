@@ -4,6 +4,7 @@
 *.jpg
 *.mat
 *.h5
+MODELS
 PAPERS
 SAMPLE_DATA
 .DS_Store
