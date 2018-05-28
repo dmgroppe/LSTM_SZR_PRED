@@ -298,6 +298,7 @@ for i in range(n_train_iter):
     # val_eeg_loss.append(temp_eeg_loss / n_valid_batch)
     # val_art_loss.append(temp_art_loss / n_valid_batch)
     # val_loss.append((val_eeg_loss[-1]+val_art_loss[-1])/2)
+    train_iter = np.arange(1, len(val_loss) + 1)
     plt.figure(1)
     plt.clf()
     plt.errorbar(train_iter, np.asarray(val_loss), yerr=np.asarray(val_loss_se*1.96), fmt='s-', label='val')
@@ -327,6 +328,7 @@ for i in range(n_train_iter):
         break
 
 # Plot Training & Validation Error
+train_iter=np.arange(1,len(val_loss)+1)
 plt.figure(1)
 plt.clf()
 plt.errorbar(train_iter, np.asarray(val_loss), yerr=np.asarray(val_loss_se * 1.96), fmt='s-', label='val')
