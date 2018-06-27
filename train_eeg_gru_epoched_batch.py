@@ -11,7 +11,7 @@ from keras.layers import Dense, SimpleRNN, Activation, Dropout, Merge
 if sys.platform=='darwin':
     from keras.layers import GRU
 else:
-    from keras.layers import CuDNNGRU, GRU
+    from keras.layers import CuDNNGRU
 from keras.optimizers import RMSprop, SGD
 from keras.constraints import max_norm
 import scipy.io as sio
@@ -74,50 +74,33 @@ def get_data_clip(x,y_eeg,y_art,id_range,n_clip_tpt,n_wind):
 
 
 # Function for creating model
-def create_merge_model(stateful,n_wind,batch_size,n_hidden,n_layers,lrate,opt):
-    n_gru=512
-    # FF Branch
-    ff_model = Sequential()
-    # Add initial RELU layer
-    ff_model.add(SimpleRNN(int(n_gru),
-                  input_shape=(n_wind, 1),
-                  batch_size=batch_size,
-                  activation='relu',
-                  recurrent_constraint=max_norm(0.0),
-                  #return_sequences=True,
-                  dropout=0.5,
-                  stateful=stateful))
-
-    # GRU Branch
-    r_model = Sequential()
-    r_model.add(SimpleRNN(int(n_wind*2),
-                  input_shape=(n_wind, 1),
-                  batch_size=batch_size,
-                  activation='relu',
-                  recurrent_constraint=max_norm(0.0),
-                  return_sequences=True,
-                  dropout=0.5,
-                  stateful=stateful))
-    if sys.platform == "darwin":
-        r_model.add(GRU(n_gru,
-                  # input_shape=(n_wind, 1),
-                  #batch_size=batch_size,
-                  stateful=stateful))
-    else:
-        # Merging doesn't work with CuDNNGRU
-        # r_model.add(CuDNNGRU(n_gru,
-        #           #input_shape=(n_wind, 1),
-        #           #batch_size=batch_size,
-        #           stateful=stateful))
-        r_model.add(GRU(n_gru,
-                  # input_shape=(n_wind, 1),
-                  #batch_size=batch_size,
-                  stateful=stateful))
-    # Merge branches
+def create_model(stateful,n_wind,batch_size,n_hidden,n_layers,lrate,opt):
     model = Sequential()
-    model.add(Merge([ff_model, r_model], mode='concat'))
+    # Add initial RELU layer
+    # model.add(SimpleRNN(int(n_hidden[0]),
+    #               input_shape=(n_wind, 1),
+    #               batch_size=batch_size,
+    #               activation='relu',
+    #               recurrent_constraint=max_norm(0.0),
+    #               return_sequences=True,
+    #               dropout=0.5,
+    #               stateful=stateful))
+    # # Add GRU Layer
+    if n_layers==1:
+        if sys.platform == "darwin":
+            model.add(GRU(int(n_hidden[1]),
+                      input_shape=(n_wind, 1),
+                      batch_size=batch_size,
+                      return_sequences=True,
+                      stateful=stateful))
+        else:
+            model.add(CuDNNGRU(int(n_hidden[1]),
+                      input_shape=(n_wind, 1),
+                      batch_size=batch_size,
+                      return_sequences=True,
+                      stateful=stateful))
     # Add RELU layer
-    model.add(Dense(int(n_gru*2)))
+    model.add(Dense(int(n_hidden[1])))
     model.add(Activation('relu'))
     model.add(Dropout(0.5))
     # Linear Output Layer
@@ -134,6 +117,7 @@ def create_merge_model(stateful,n_wind,batch_size,n_hidden,n_layers,lrate,opt):
         model.compile(loss='mse', optimizer=rmsp)
     model.summary()
     return model
+
 
 
 def format_ep(raw_ep, clean_ep, art_ep, n_wind, n_tpt, mid_wind):
@@ -215,7 +199,7 @@ valid_ids=np.arange(n_train_ep,n_train_ep+n_valid_ep)
 test_ids=np.arange(n_train_ep+n_valid_ep,n_train_ep+n_valid_ep+n_test_ep)
 
 print('Creating Stateful Model...')
-batch_size = 1
+batch_size = 1 # ??
 n_wind=31
 n_hidden=np.zeros(2,dtype=int)
 n_hidden[0]=128
@@ -234,7 +218,8 @@ else:
     n_test_batch = 1  # # of test epochs to plot and estimate testing error on
 
 stateful=True
-model_stateful = create_merge_model(stateful,n_wind,batch_size,n_hidden,n_layers,lr,opt)
+model_stateful = create_model(stateful,n_wind,batch_size,n_hidden,n_layers,lr,opt)
+#model_stateful = create_merge_model(stateful,n_wind,batch_size,n_hidden,n_layers,lr,opt)
 model_fname='cuda_gru_epoched.h5'
 out_metrics_fname = os.path.join(model_path, 'train_metrics.npz')
 
@@ -264,7 +249,7 @@ for i in range(n_train_iter):
         # grab a random training epoch
         epoch_id=np.random.randint(0,n_train_ep)
         x_train, y_train=format_ep(raw[:,epoch_id], clean[:,epoch_id], art[:,epoch_id], n_wind, n_tpt, mid_wind)
-        train_hist=model_stateful.fit([x_train, x_train],
+        train_hist=model_stateful.fit(x_train,
                            y_train,
                            batch_size=batch_size,
                            epochs=1,
@@ -286,7 +271,7 @@ for i in range(n_train_iter):
         # grab a random validation epoch
         epoch_id = np.random.randint(n_train_ep, n_train_ep+n_valid_ep)
         x, y = format_ep(raw[:, epoch_id], clean[:, epoch_id], art[:, epoch_id], n_wind, n_tpt, mid_wind)
-        y_hat = model_stateful.predict([x, x],batch_size=batch_size)
+        y_hat = model_stateful.predict(x,batch_size=batch_size)
         temp_eeg_loss[j]= np.sqrt(np.mean(np.square(y[:,0]-y_hat[:,0])))
         temp_art_loss[j]= np.sqrt(np.mean(np.square(y[:,1]-y_hat[:,1])))
         temp_grand_loss[j]= np.sqrt(np.mean(np.square(y - y_hat)))
@@ -353,7 +338,7 @@ for j in range(n_test_batch):
     # grab a random test epoch
     epoch_id = np.random.randint(n_train_ep+n_valid_ep, n_train_ep + n_valid_ep+n_test_ep)
     x, y = format_ep(raw[:, epoch_id], clean[:, epoch_id], art[:, epoch_id], n_wind, n_tpt, mid_wind)
-    y_hat = model_stateful.predict([x, x], batch_size=batch_size)
+    y_hat = model_stateful.predict(x, batch_size=batch_size)
     temp_eeg_loss += np.sqrt(np.mean(np.square(y[:, 0] - y_hat[:, 0])))
     temp_art_loss += np.sqrt(np.mean(np.square(y[:, 1] - y_hat[:, 1])))
     model_stateful.reset_states()

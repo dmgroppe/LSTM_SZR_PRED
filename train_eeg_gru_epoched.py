@@ -270,7 +270,8 @@ else:
     n_test_batch = 1  # # of test epochs to plot and estimate testing error on
 
 stateful=True
-model_stateful = create_model(stateful,n_wind,batch_size,n_hidden,n_layers,lr,opt)
+#model_stateful = create_model(stateful,n_wind,batch_size,n_hidden,n_layers,lr,opt)
+model_stateful = create_merge_model(stateful,n_wind,batch_size,n_hidden,n_layers,lr,opt)
 model_fname='cuda_gru_epoched.h5'
 out_metrics_fname = os.path.join(model_path, 'train_metrics.npz')
 

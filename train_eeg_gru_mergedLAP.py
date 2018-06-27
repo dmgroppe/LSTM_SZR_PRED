@@ -11,7 +11,7 @@ from keras.layers import Dense, SimpleRNN, Activation, Dropout, Merge
 if sys.platform=='darwin':
     from keras.layers import GRU
 else:
-    from keras.layers import CuDNNGRU, GRU
+    from keras.layers import CuDNNGRU
 from keras.optimizers import RMSprop, SGD
 from keras.constraints import max_norm
 import scipy.io as sio
@@ -75,7 +75,7 @@ def get_data_clip(x,y_eeg,y_art,id_range,n_clip_tpt,n_wind):
 
 # Function for creating model
 def create_merge_model(stateful,n_wind,batch_size,n_hidden,n_layers,lrate,opt):
-    n_gru=512
+    n_gru=128
     # FF Branch
     ff_model = Sequential()
     # Add initial RELU layer
@@ -104,13 +104,8 @@ def create_merge_model(stateful,n_wind,batch_size,n_hidden,n_layers,lrate,opt):
                   #batch_size=batch_size,
                   stateful=stateful))
     else:
-        # Merging doesn't work with CuDNNGRU
-        # r_model.add(CuDNNGRU(n_gru,
-        #           #input_shape=(n_wind, 1),
-        #           #batch_size=batch_size,
-        #           stateful=stateful))
-        r_model.add(GRU(n_gru,
-                  # input_shape=(n_wind, 1),
+        r_model.add(CuDNNGRU(n_gru,
+                  #input_shape=(n_wind, 1),
                   #batch_size=batch_size,
                   stateful=stateful))
     # Merge branches

@@ -1,0 +1,36 @@
+'comments': ['0.000,15.617,4,65542,Testing', '16.617,50.059,0,65542,TestClip']
+
+'calibration': '0.2'
+
+ 'testdate': '2015.06.12', 'testtime': '08:44:52
+
+'sampletimes': [{'sample': 0.0, 'time': 31496.518}, {'sample': 8507.0, 
+'time': 31538.719}],
+
+'channelmap': ['lhd1-ref', 'lhd2-ref', 'lhd3-ref', 'lhd4-ref', 
+'lfp1-ref', 'lfp2-ref', 'lfp3-ref', 'lfp4-ref', 'lfp5-ref', 'lfp6-ref', 
+'lfp7-ref', 'lfp8-ref', 'lfp9-ref', 'lfp10-ref', 'lfp11-ref', 
+'lfp12-ref', 'laf1-ref', 'laf2-ref', 'laf3-ref', 'laf4-ref', 'laf5-ref', 
+'laf6-ref', 'laf7-ref', 'laf8-ref', 'lmf1-ref', 'lmf2-ref', 'lmf3-ref', 
+'lmf4-ref', 'lmf5-ref', 'lmf6-ref', 'lpf1-ref', 'lpf3-ref', 'lpf4-ref', 
+'lpf5-ref', 'lpf6-ref', 'lpf7-ref', 'lpf8-ref', 'lat1-ref', 'lat2-ref', 
+'lat3-ref', 'lat4-ref', 'lmt1-ref', 'lmt2-ref', 'lmt3-ref', 'lmt4-ref', 
+'lpt1-ref', 'lpt2-ref', 'lpt3-ref', 'lpt4-ref', 'lpt5-ref', 'lpt6-ref', 
+'c52-ref', 'c53-ref', 'c54-ref', 'c55-ref', 'c56-ref', 'c57-ref', 
+'c58-ref', 'c59-ref', 'c60-ref', 'c61-ref', 'c62-ref', 'c63-ref', 
+'c64-ref', 'rhd1-ref', 'rhd2-ref', 'rhd3-ref', 'rhd4-ref', 'rfp1-ref', 
+'rfp2-ref', 'rfp3-ref', 'rfp4-ref', 'rfp5-ref', 'rfp6-ref', 'rfp7-ref', 
+'rfp8-ref', 'rfp9-ref', 'rfp10-ref', 'rfp11-ref', 'rfp12-ref', 
+'raf1-ref', 'raf2-ref', 'raf3-ref', 'raf4-ref', 'raf5-ref', 'raf6-ref', 
+'raf7-ref', 'raf8-ref', 'rmf1-ref', 'rmf2-ref', 'rmf3-ref', 'rmf4-ref', 
+'rmf5-ref', 'rmf6-ref', 'rpf1-ref', 'rpf2-ref', 'rpf3-ref', 'rpf4-ref', 
+'rpf5-ref', 'rpf6-ref', 'rpf7-ref', 'rpf8-ref', 'raih1-ref', 
+'raih2-ref', 'raih3-ref', 'raih4-ref', 'raih5-ref', 'raih6-ref', 
+'rpih1-ref', 'rpih2-ref', 'rpih3-ref', 'rpih4-ref', 'rpih5-ref', 
+'rpih6-ref', 'rat1-ref', 'rat2-ref', 'rat3-ref', 'rat4-ref', 'rmt1-ref', 
+'rmt2-ref', 'rmt3-ref', 'rmt4-ref', 'rpt1-ref', 'rpt2-ref', 'rpt3-ref', 
+'rpt4-ref', 'rpt5-ref', 'rpt6-ref', 'c129-ref', 'c130-ref', 'c131-ref', 
+
+'c132-ref', 'c133-ref', 'c134-ref', 'c135-ref', 'c136-ref', 'c137-ref', 
+'c138-ref', 'c139-ref', 'c140-ref', 'c141-ref', 'c142-ref', 'c143-ref', 
+'c144-ref', 'c145-ref', 'c146-ref', 'c147-ref', 'c148-ref', 'event']

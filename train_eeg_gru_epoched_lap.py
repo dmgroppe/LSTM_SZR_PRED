@@ -247,7 +247,8 @@ if __name__ == '__main__':
             epoch_id=np.random.randint(0,n_train_ep)
             train_ids[j]=epoch_id
             x_train, y_train=format_ep(raw[:,epoch_id], clean[:,epoch_id], art[:,epoch_id], n_wind, n_tpt, mid_wind)
-            print("x-train.shape {}".format(x_train.shape))
+            # print("x-train.shape {}".format(x_train.shape))
+            # print("y-train.shape {}".format(y_train.shape))
             train_hist=model_stateful.fit(x_train,
                                y_train,
                                batch_size=batch_size,
