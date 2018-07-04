@@ -1,7 +1,0 @@
-{"model_name": "GruFf",
-"n_layers": 1,
-"n_hidden": 1024,
-"learning_rate": 0.000001,
-"optimizer": "rmsprop",
-"patience": 10}
-
